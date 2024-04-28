@@ -16,9 +16,7 @@
 
 
 #include "socketUtil.h"
-
 #include "timeUtil.h"
-
 #include "base.h"
 #include "log.h"
 
@@ -26,12 +24,13 @@
 /**                                            DEFINES                                            **/
 /*************************************************************************************************/
 
-#define SOCKET_KEEPALIVE_INTERVAL    (15)
-#define SOCKT_LISTEN_BACKLOG        (511)
-#define UNIX_SOCKET_FILE_PERM       (700)
+#define SOCKET_CONNECT_RETRIES          (3)
+#define SOCKET_KEEPALIVE_INTERVAL       (15)
+#define SOCKT_LISTEN_BACKLOG            (511)
+#define UNIX_SOCKET_FILE_PERM           (700)
 
-#define SWITCH_ON                   (1)
-#define SWITCH_OFF                  (0)
+#define SWITCH_ON                       (1)
+#define SWITCH_OFF                      (0)
 
 #define CHECK_PORT_IS_LEGAL(port)           ((port) > 0 && (port) <= 65535)  
 
@@ -51,33 +50,36 @@
 /**                                       PRIVATE FUNCTIONS                                      **/
 /*************************************************************************************************/
 
-static int socketfdCheckConnectDone(int socketfd, int *completed)
+static int socketfdCheckConnectDone(int socketfd, struct sockaddr *saddr, socklen_t addrlen, int *completed)
 {
     int ret = 0;
     
-    ret = connect(socketfd, (const struct sockaddr *)c->saddr, c->addrlen);
-    
-    if (ret == 0) {
+    CHECK_INPARA_ENSURE((INVALID_FD != socketfd) && (NULL != saddr));
+
+    if (0 == connect(socketfd, saddr, addrlen))
+    {
         *completed = 1;
         return RET_OK;
     }
-    switch (errno) {
-    case EISCONN:
-        *completed = 1;
-        return RET_OK;
-    case EALREADY:
-    case EINPROGRESS:
-    case EWOULDBLOCK:
-        *completed = 0;
-        return RET_OK;
-    default:
-        return RET_ERROR;
+
+    switch (errno)
+    {
+        case EISCONN:
+            *completed = 1;
+            return RET_OK;
+        case EALREADY:
+        case EINPROGRESS:
+        case EWOULDBLOCK:
+            *completed = 0;
+            return RET_OK;
+        default:
+            return RET_ERROR;
     }
 
     return RET_OK;
 }
 
-static int socketfdConnectWaitReady(int socketfd, long msec)
+static int socketfdConnectWaitReady(int socketfd, struct sockaddr *saddr, socklen_t addrlen, long msec)
 {
     int ret = 0;
     struct pollfd   wfd[1] = { 0 };
@@ -99,7 +101,8 @@ static int socketfdConnectWaitReady(int socketfd, long msec)
             return RET_ERROR;
         }
 
-        if (redisCheckConnectDone(c, &res) != REDIS_OK || res == 0) 
+        if (RET_OK != socketfdCheckConnectDone(socketfd, saddr, addrlen, &ret) || 
+            ret == 0)
         {
             DEBUG_LOG_ERROR("connect error!");
             return RET_ERROR;
@@ -139,30 +142,35 @@ int unixDomainSocketServerCreate(const char *unixPath)
 
     if (RET_ERROR == socketfdReuseAddrSet(socketfd, SWITCH_ON)) 
     {
-        close(socketfd);
+        BASE_CLOSE_FD(socketfd);
         return RET_ERROR;
     }
-
-    memset(&sa, DEFAULT_VALUE_ZERO, sizeof(struct sockaddr_un));
 
     sa.sun_family = AF_UNIX;
     strncpy(sa.sun_path, unixPath, sizeof(sa.sun_path) - 1);
 
-    if (0 > bind(socketfd, (struct sockaddr *)&sa, SUN_LEN(&sa))) 
+    if (0 != bind(socketfd, (struct sockaddr *)&sa, SUN_LEN(&sa))) 
     {
-        close(socketfd);
+        BASE_CLOSE_FD(socketfd);
         DEBUG_LOG_ERROR("bind error: %s", strerror(errno));
         return RET_ERROR;
     }
 
-    if (-1 == listen(socketfd, SOCKT_LISTEN_BACKLOG)) 
+    if (0 != listen(socketfd, SOCKT_LISTEN_BACKLOG)) 
     {
-        close(socketfd);
+        BASE_CLOSE_FD(socketfd);
         DEBUG_LOG_ERROR("listen error: %s", strerror(errno));
         return RET_ERROR;
     }
 
     chmod(sa.sun_path, UNIX_SOCKET_FILE_PERM);
+
+    if (RET_OK != socketfdCloexecSet(socketfd, SWITCH_ON) ||
+        RET_OK != socketfdNonBlockSet(socketfd, SWITCH_ON))
+    {
+        BASE_CLOSE_FD(socketfd);
+        return RET_ERROR;
+    }
 
     return socketfd;
 }
@@ -177,15 +185,9 @@ int tcpSocketServerCreate(const char *ip, const int port)
 
     snprintf(_port, 6, "%d", port);
 
-    memset(&hints, DEFAULT_VALUE_ZERO, sizeof(hints));
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;    /* No effect if bindaddr != NULL */
-
-    if (NULL != ip && !strcmp("*", ip))
-    {
-        ip = NULL;
-    }    
 
     if (0 != (rv = getaddrinfo(ip, _port, &hints, &servinfo))) 
     {
@@ -206,15 +208,21 @@ int tcpSocketServerCreate(const char *ip, const int port)
             goto error;
         }
 
-        if (0 > bind(socketfd, (struct sockaddr *)&sa, SUN_LEN(&sa))) 
+        if (0 != bind(socketfd, (struct sockaddr *)&sa, SUN_LEN(&sa))) 
         {
             DEBUG_LOG_ERROR("bind error: %s", strerror(errno));
             goto error;
         }
 
-        if (-1 == listen(socketfd, SOCKT_LISTEN_BACKLOG)) 
+        if (0 != listen(socketfd, SOCKT_LISTEN_BACKLOG)) 
         {
             DEBUG_LOG_ERROR("listen error: %s", strerror(errno));
+            goto error;
+        }
+
+        if (RET_OK != socketfdCloexecSet(socketfd, SWITCH_ON) ||
+            RET_OK != socketfdNonBlockSet(socketfd, SWITCH_ON))
+        {
             goto error;
         }
 
@@ -239,7 +247,7 @@ int unixSocketConnect(const char *unixPath, const struct timeval *connectTimeout
 	long timeoutMsec = -1;
 	struct sockaddr_un sa = { 0 };
 
-    CHECK_INPARA_ENSURE((NULL != unixPath));
+    CHECK_INPARA_ENSURE((NULL != unixPath) && (strlen(unixPath) > (sizeof(sa.sun_path) - 1)));
 
     if (RET_OK != timeUtilTv2Msec(connectTimeout, &timeoutMsec))
 	{
@@ -265,7 +273,7 @@ int unixSocketConnect(const char *unixPath, const struct timeval *connectTimeout
 	{
         if (errno == EINPROGRESS) 
         {
-            if (RET_OK != socketfdConnectWaitReady(socketfd, timeoutMsec))
+            if (RET_OK != socketfdConnectWaitReady(socketfd, (struct sockaddr*)&sa,  timeoutMsec))
 			{
 				goto error;
 			} 
@@ -276,12 +284,6 @@ int unixSocketConnect(const char *unixPath, const struct timeval *connectTimeout
         }
     }
 
-    /** 需要加入epoll 所以必须非阻塞 **/
-    if (RET_OK != socketfdNonBlockSet(socketfd, SWITCH_ON))
-	{
-		goto error;
-	}
-
 	return socketfd;
 error:
     BASE_CLOSE_FD(socketfd);
@@ -290,12 +292,9 @@ error:
 
 int tcpSocketConnect(const char *ip, const int port, const struct timeval *connectTimeout)
 {
-    int socketfd = INVALID_FD, rv = 0;
+    int socketfd = INVALID_FD, rv = 0, reuses = 0;
     char _port[6];              /* strlen("65535"); */
     struct addrinfo hints = { 0 }, *servinfo = NULL, *bservinfo = NULL, *p = NULL , *b = NULL;
-    int blocking = (c->flags & REDIS_BLOCK);
-    int reuseaddr = (c->flags & REDIS_REUSEADDR);
-    int reuses = 0;
     long timeoutMsec = -1;
 
     CHECK_INPARA_ENSURE((NULL != ip) && CHECK_PORT_IS_LEGAL(port));
@@ -307,7 +306,6 @@ int tcpSocketConnect(const char *ip, const int port, const struct timeval *conne
 	}
 
     snprintf(_port, 6, "%d", port);
-    memset(&hints, DEFAULT_VALUE_ZERO, sizeof(hints));
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
 
@@ -319,7 +317,7 @@ int tcpSocketConnect(const char *ip, const int port, const struct timeval *conne
     for (p = servinfo; p != NULL; p = p->ai_next) 
     {
 addrretry:
-        if (INVALID_FD == (socketfd = socket(p->ai_family,p->ai_socktype,p->ai_protocol)))
+        if (INVALID_FD == (socketfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)))
         {    
             continue;
         }
@@ -328,40 +326,6 @@ addrretry:
 	    {
 		    goto error;
 	    }
-
-        if (c->tcp.source_addr) {
-            int bound = 0;
-            /* Using getaddrinfo saves us from self-determining IPv4 vs IPv6 */
-            if ((rv = getaddrinfo(c->tcp.source_addr, NULL, &hints, &bservinfo)) != 0) {
-                char buf[128];
-                snprintf(buf,sizeof(buf),"Can't get addr: %s",gai_strerror(rv));
-                __redisSetError(c,REDIS_ERR_OTHER,buf);
-                goto error;
-            }
-
-            if (reuseaddr) {
-                n = 1;
-                if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (char*) &n,
-                               sizeof(n)) < 0) {
-                    freeaddrinfo(bservinfo);
-                    goto error;
-                }
-            }
-
-            for (b = bservinfo; b != NULL; b = b->ai_next) {
-                if (bind(s,b->ai_addr,b->ai_addrlen) != -1) {
-                    bound = 1;
-                    break;
-                }
-            }
-            freeaddrinfo(bservinfo);
-            if (!bound) {
-                char buf[128];
-                snprintf(buf,sizeof(buf),"Can't bind socket: %s",strerror(errno));
-                __redisSetError(c,REDIS_ERR_OTHER,buf);
-                goto error;
-            }
-        }
 
         if (-1 == connect(socketfd, p->ai_addr, p->ai_addrlen)) 
         {
@@ -372,38 +336,31 @@ addrretry:
             } 
             else if (errno == EINPROGRESS) 
             {
-                if (blocking) {
-                    goto wait_for_ready;
-                }
-                /* This is ok.
-                 * Note that even when it's in blocking mode, we unset blocking
-                 * for `connect()`
-                 */
-            } 
-            else if (errno == EADDRNOTAVAIL && reuseaddr) 
-            {
-                if (++reuses >= REDIS_CONNECT_RETRIES) {
+                if (RET_OK != socketfdConnectWaitReady(socketfd, p->ai_addr, p->ai_addrlen, timeoutMsec))
+                {
                     goto error;
-                } else {
-                    redisNetClose(c);
+                }
+            }
+            else if (errno == EADDRNOTAVAIL) 
+            {
+                if ((++ reuses) >= SOCKET_CONNECT_RETRIES) 
+                {
+                    goto error;
+                }
+                else
+                {
+                    BASE_CLOSE_FD(socketfd);
                     goto addrretry;
                 }
             } 
             else 
             {
-                wait_for_ready:
-                if (redisContextWaitReady(c,timeout_msec) != REDIS_OK)
-                    goto error;
-                if (redisSetTcpNoDelay(c) != REDIS_OK)
-                    goto error;
+                goto error;
             }
         }
-        if (blocking && redisSetBlocking(c,1) != REDIS_OK)
-            goto error;
 
-        c->flags |= REDIS_CONNECTED;
-        rv = REDIS_OK;
-        goto end;
+        BASE_DESTROY(servinfo, freeaddrinfo);
+        return socketfd;
     }
     
     if (p == NULL)

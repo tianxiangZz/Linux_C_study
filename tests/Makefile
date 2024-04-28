@@ -3,7 +3,7 @@
 
 
 all:
-	gcc -g main.c ../src/threadPool.c -I../include/ -lpthread -o main
+	gcc -g main.c ../src/threadPool.c ../src/buffer.c -I../include/ -lpthread -o main
 
 clean:
 	rm -f demo
