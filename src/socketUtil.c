@@ -29,9 +29,6 @@
 #define SOCKT_LISTEN_BACKLOG            (511)
 #define UNIX_SOCKET_FILE_PERM           (700)
 
-#define SWITCH_ON                       (1)
-#define SWITCH_OFF                      (0)
-
 #define CHECK_PORT_IS_LEGAL(port)           ((port) > 0 && (port) <= 65535)  
 
 /*************************************************************************************************/

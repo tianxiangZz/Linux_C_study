@@ -12,6 +12,14 @@ extern "C" {
 
 
 /*************************************************************************************************/
+/**                                            DEFINES                                            **/
+/*************************************************************************************************/
+
+#define SWITCH_ON                       (1)
+#define SWITCH_OFF                      (0)
+
+
+/*************************************************************************************************/
 /**                                       PUBLIC FUNCTIONS                                      **/
 /*************************************************************************************************/
 
@@ -25,7 +33,7 @@ int socketfdReusePortSet(int socketfd, int isOpen);
 int socketfdSendTimeoutSet(int socketfd, const struct timeval *tv);
 int socketfdRecvTimeoutSet(int socketfd, const struct timeval *tv);
 
-int socketfdKeepAliveSet(int socketfd, int isOpen);
+int socketfdKeepAliveSet(int socketfd, int isOpen, int interval);
 
 int unixDomainSocketServerCreate(const char *unixPath);
 int tcpSocketServerCreate(const char *ip, const int port);

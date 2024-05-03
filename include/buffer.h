@@ -32,8 +32,13 @@ int bufferReadWithRemove(buffer *buf, void *data, size_t dataLen);
 
 size_t bufferWritableSize(buffer *buf);
 void *bufferWritePeek(buffer *buf);
+int bufferWriteAlready(buffer *buf, size_t dataLen);
 int bufferWriteUndo(buffer *buf, size_t dataLen);
-size_t bufferWriteAppend(buffer *buf, const void *data, size_t dataLen);
+int bufferWriteAppend(buffer *buf, const void *data, size_t dataLen);
+
+// show: buffer's addr、size、readableLen
+void bufferInfoShow(buffer *buf);
+
 
 
 #ifdef __cplusplus

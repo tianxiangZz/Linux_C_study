@@ -47,10 +47,24 @@ struct _buffer
 /**                                       PRIVATE FUNCTIONS                                      **/
 /*************************************************************************************************/
 
+static int bufferReadableToBegin(buffer *buf)
+{
+    size_t readableLen = 0;
+    CHECK_INPARA_ENSURE(NULL != buf);
+
+    readableLen = BUFFER_READABLE_SIZE(buf);
+    memmove(buf->buf, (buf->buf + buf->readIndex), readableLen);
+    buf->readIndex = 0;
+    buf->writeIndex = buf->readIndex + readableLen;
+
+    return RET_OK;
+}
+
 static int bufferEnsureWritableSize(buffer *buf, size_t dataLen)
 {
     size_t writableLen = 0, readableLen = 0;
     size_t newLen = 0, minLen = 0;
+    void *newbuf = NULL;
 
     CHECK_INPARA_ENSURE(NULL != buf);
 
@@ -63,21 +77,16 @@ static int bufferEnsureWritableSize(buffer *buf, size_t dataLen)
     else if (dataLen <= (writableLen + buf->readIndex))
     {
         // move
-        readableLen = BUFFER_READABLE_SIZE(buf);
-        memmove(buf->buf, (buf->buf + buf->readIndex), readableLen);
-        buf->readIndex = 0;
-        buf->writeIndex = buf->readIndex + readableLen;
+        return bufferReadableToBegin(buf);
     }
     else
     {
-        // re malloc and move
+        // move and realloc
+        if (RET_OK != bufferReadableToBegin(buf))
+        {
+            return RET_ERROR;
+        }
         minLen = dataLen + BUFFER_READABLE_SIZE(buf);
-        // if (buf->bufsize >= minLen)
-        // {
-        //     return RET_ERROR;
-        // }
-        // 一定不会出现以上情况
-
         newLen = buf->bufsize;
         while (newLen < minLen)
         {
@@ -88,19 +97,14 @@ static int bufferEnsureWritableSize(buffer *buf, size_t dataLen)
             newLen = minLen;
         }
 
-        
+        if (NULL == (newbuf = BASE_REALLOC(buf->buf, newLen)))
+        {
+            return RET_ERROR;
+        }
 
-
-
-
-
-
-
-
-
-
-
-
+        buf->bufsize = newLen;
+        buf->buf = newbuf;
+        return RET_OK;
     }
 
     return RET_ERROR;
@@ -233,11 +237,17 @@ int bufferWriteAlready(buffer *buf, size_t dataLen)
 
 int bufferWriteUndo(buffer *buf, size_t dataLen)
 {
+    size_t readableLen = 0;
     CHECK_INPARA_ENSURE(NULL != buf);
 
-    if (dataLen <= BUFFER_READABLE_SIZE(buf))
+    readableLen = BUFFER_READABLE_SIZE(buf);
+    if (dataLen < readableLen)
     {
         buf->writeIndex -= dataLen;
+    }
+    else if (dataLen == readableLen)
+    {
+        buf->readIndex = buf->writeIndex = 0;
     }
     else
     {
@@ -247,18 +257,19 @@ int bufferWriteUndo(buffer *buf, size_t dataLen)
     return RET_OK;
 }
 
-size_t bufferWriteAppend(buffer *buf, const void *data, size_t dataLen)
+int bufferWriteAppend(buffer *buf, const void *data, size_t dataLen)
 {
     CHECK_INPARA_ENSURE(NULL != buf && NULL != buf->buf && NULL != data && 0 >= dataLen);
 
+    if (RET_OK != bufferEnsureWritableSize(buf, dataLen))
+    {
+        return RET_ERROR;
+    }
 
+    memcpy(buf->buf + buf->writeIndex, data, dataLen);
 
-
-
-
-
-
-
+    buf->writeIndex += dataLen;
+    return RET_OK;
 }
 
 

@@ -91,5 +91,25 @@ void eventLoopDestroy(void *data)
     return ;
 }
 
+eventLoop* eventLoopCreate();
+void eventLoopDestroy(void *data);
+
+void eventLoopispatch(eventLoop *evLoop);
+void eventLoopStop(eventLoop *evLoop);
+
+// io event
+int eventLoopAddioEvent(eventLoop *evLoop, ioEvent *ioev);            // TODO ...
+int eventLoopModioEvent(eventLoop *evLoop, ioEvent *ioev);             
+void eventLoopDelioEvent(eventLoop *evLoop, ioEvent *ioev);
+
+// timer event
+int eventLoopAddTimerEvent(eventLoop *evLoop, timerEvent *tev);
+void eventLoopDelTimerEvent(eventLoop *evLoop, timerEvent *tev);
+
+
+void sendInLoop(eventLoop *evLoop, functionInLoop fn, void *arg);
+
+
+int eventLoopForeachioEvents(eventLoop *evLoop, eventLoopForeachEventCb fn, void *arg);
 
 

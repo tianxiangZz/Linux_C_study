@@ -11,13 +11,14 @@
 /*************************************************************************************************/
 
 typedef struct _pollerBase pollerBase;
-typedef struct _firedEvent firedEvent;
+typedef struct _firedEvents firedEvents;
+
 
 /*************************************************************************************************/
 /**                                            TYPES                                            **/
 /*************************************************************************************************/
 
-struct _firedEvent
+struct _firedEvents
 {
     int fd;
     uint32_t events;
@@ -32,7 +33,7 @@ struct _pollerBase
     int (*mod)(void *pollable, int fd, uint32_t events);
     int (*del)(void *pollable, int fd, uint32_t events);
 
-    int (*dispatch)(void *pollable, struct timeval *tv, firedEvent *fireds);
+    int (*dispatch)(void *pollable, struct timeval *tv, firedEvents *fired);
 };
 
 

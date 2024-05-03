@@ -56,7 +56,19 @@
         "utility": "c",
         "stdio.h": "c",
         "chrono": "c",
-        "algorithm": "c"
+        "algorithm": "c",
+        "event_internal.h": "c",
+        "event.h": "c",
+        "buffer.h": "c",
+        "timereventheap.h": "c",
+        "eventfd.h": "c",
+        "notify.h": "c",
+        "evloop_internal.h": "c",
+        "eventnotify.h": "c",
+        "numbers": "c",
+        "io_context": "c",
+        "executor": "c",
+        "threadpool.h": "c"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }

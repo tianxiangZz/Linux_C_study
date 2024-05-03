@@ -100,20 +100,12 @@ static void* epollCreate()
     }
 
     // maybe support epoll_create1()     TODO ...  
-    if (INVALID_FD == (this->epfd = epoll_create(1024)))
+    if (INVALID_FD == (this->epfd = epoll_create1(EPOLL_CLOEXEC)))
     {
         DEBUG_LOG_DEBUG("epoll_create ERROR!");
         goto error;
     }
     // net close exec
-
-
-    // maybe not support timerfd()     TODO ...  
-    if (INVALID_FD == (this->timerfd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC)))
-    {
-        DEBUG_LOG_DEBUG("timerfd_create ERROR!");
-        goto error;
-    }
 
     return this;
 error:
@@ -192,7 +184,7 @@ static int epollDelEvent(void *pollable, int fd, uint32_t events)
     return RET_OK;
 }
 
-static int epollDispatch(void *pollable, struct timeval *tv)
+static int epollDispatch(void *pollable, struct timeval *tv, firedEvent *fireds)
 {
     int retVal = 0, timeoutMsec = 0, i = 0;
     epoll *this = (epoll *)pollable;
@@ -206,15 +198,19 @@ static int epollDispatch(void *pollable, struct timeval *tv)
 
     retVal = epoll_wait(this->epfd, this->events, this->nevents, timeoutMsec);
     
-    if (retVal == -1 && errno != EINTR)
+    if (retVal == -1)
     {
-        DEBUG_LOG_ERROR("epoll_wait error %s!", strerror(errno));
-        return RET_ERROR;
+		if (errno != EINTR)
+        {
+			return RET_ERROR;
+		}
+		return RET_OK;
     }
 
     for (i = 0; i < retVal; ++ i)
     {
-        // TODO ...
+        fireds[i].fd = this->events[i].data.fd;
+        fireds[i].events = this->events[i].events;
     }
 
     if (retVal == this->nevents && this->nevents < EPOLL_MAX_NEVENT)
@@ -229,5 +225,5 @@ static int epollDispatch(void *pollable, struct timeval *tv)
         }
     }
 
-    return RET_OK;
+    return retVal;
 }

@@ -1,6 +1,6 @@
 
-#ifndef __EVENT_LOOP_H__
-#define __EVENT_LOOP_H__
+#ifndef __EVENT_NOTIFY_H__
+#define __EVENT_NOTIFY_H__
 
 
 #ifdef __cplusplus
@@ -11,48 +11,27 @@ extern "C" {
 /**                                        INCLUDE FILES                                       **/
 /*************************************************************************************************/
 
-#include <sys/time.h>
-#include "event.h"
+#include "eventLoop.h"
 
 /*************************************************************************************************/
 /**                                            DEFINES                                            **/
 /*************************************************************************************************/
 
-typedef int (*eventLoopForeachEventCb)(const eventLoop *, const eventBase *, void *);
-
-typedef void (*functionInLoop)(void *);
-
-struct _eventLoop;
-typedef struct _eventLoop eventLoop;
+struct _eventNotify;
+typedef struct _eventNotify eventNotify;
 
 /*************************************************************************************************/
 /**                                       PUBLIC FUNCTIONS                                      **/
 /*************************************************************************************************/
 
-eventLoop* eventLoopCreate();
-void eventLoopDestroy(void *data);
+eventNotify *eventNotifyCreate(eventLoop *evLoop);
+void eventNotifyDestroy(void* data);
 
-void eventLoopispatch(eventLoop *evLoop);
-void eventLoopStop(eventLoop *evLoop);
-
-// io event
-int eventLoopAddioEvent(eventLoop *evLoop, ioEvent *ioev);            // TODO ...
-int eventLoopModioEvent(eventLoop *evLoop, ioEvent *ioev);             
-void eventLoopDelioEvent(eventLoop *evLoop, ioEvent *ioev);
-
-// timer event
-int eventLoopAddTimerEvent(eventLoop *evLoop, timerEvent *tev);
-void eventLoopDelTimerEvent(eventLoop *evLoop, timerEvent *tev);
-
-
-void sendInLoop(eventLoop *evLoop, functionInLoop fn, void *arg);
-
-
-int eventLoopForeachioEvents(eventLoop *evLoop, eventLoopForeachEventCb fn, void *arg);
-
+void eventNotifyEnable(eventNotify *notify);
+void eventNotifyCall(eventNotify *notify);
 
 #ifdef __cplusplus
 }
 #endif                  /** __cplusplus */
 
-#endif                  /** __EVENT_LOOP_H__ */
+#endif                  /** __EVENT_NOTIFY_H__ **/
