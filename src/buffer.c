@@ -235,10 +235,13 @@ int bufferWriteAlready(buffer *buf, size_t dataLen)
     return RET_OK;
 }
 
-int bufferWriteUndo(buffer *buf, size_t dataLen)
+void bufferWriteUndo(buffer *buf, size_t dataLen)
 {
     size_t readableLen = 0;
-    CHECK_INPARA_ENSURE(NULL != buf);
+    if (NULL == buf || 0 == dataLen)
+    {
+        return ;
+    }
 
     readableLen = BUFFER_READABLE_SIZE(buf);
     if (dataLen < readableLen)
@@ -251,10 +254,10 @@ int bufferWriteUndo(buffer *buf, size_t dataLen)
     }
     else
     {
-        return RET_ERROR;
+        return ;
     }
 
-    return RET_OK;
+    return ;
 }
 
 int bufferWriteAppend(buffer *buf, const void *data, size_t dataLen)

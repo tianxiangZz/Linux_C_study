@@ -89,6 +89,7 @@ struct _iobufferEvent
     ioEventRWCallback writecb;
     ioEventErrorCallback errorcb;
 
+    void *args;
     buffer *input;
     buffer *ouput;
 };
@@ -128,11 +129,11 @@ iobufferEvent *iobufferEventCreate(struct _eventLoop *evLoop, int fd);
 int iobufferEventCallbacksSet(iobufferEvent *bufferEvent, ioEventRWCallback readcb, ioEventRWCallback writecb, 
     ioEventErrorCallback errorcb, void *args);
 void iobufferEventDestroy(void *data);
-int iobufferEventEnableRead(ioEvent *ioev);
-int iobufferEventEnableWrite(ioEvent *ioev);
-int iobufferEventDisableRead(ioEvent *ioev);
-int iobufferEventDisableWrite(ioEvent *ioev);
-int iobufferEventDelete(ioEvent *ioev);
+int iobufferEventEnableRead(iobufferEvent *this);
+int iobufferEventEnableWrite(iobufferEvent *this);
+int iobufferEventDisableRead(iobufferEvent *this);
+int iobufferEventDisableWrite(iobufferEvent *this);
+int iobufferEventDelete(iobufferEvent *this);
 
 
 
@@ -141,7 +142,7 @@ timerEvent *timerEventCreate(struct _eventLoop *evLoop, int flag,
     struct timeval *tv, timerEventCallback cb, void *args);
 void timerEventDestroy(void *data);
 int timerEventEnable(timerEvent *timerev);
-int timerEventStop(timerEvent *timerev);
+int timerEventDisable(timerEvent *timerev);
 
 
 #ifdef __cplusplus

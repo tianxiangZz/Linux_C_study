@@ -31,7 +31,7 @@
 /*************************************************************************************************/
 
 /*************************************************************************************************/
-/**                                            VARIABLES                                       **/
+/**                                       PRIVATE FUNCTIONS                                      **/
 /*************************************************************************************************/
 
 static void ioEventEnableInLoop(void *ioev)
@@ -99,6 +99,8 @@ static void timerEventDisableInLoop(void *data)
     eventLoopDelTimerEvent(this->evLoop, this);
     return ;
 }
+
+void iobufferEventCallback(int , uint32_t, void *);
 
 /*************************************************************************************************/
 /**                                       PUBLIC FUNCTIONS                                      **/
@@ -189,15 +191,94 @@ void ioEventDeInit(ioEvent *this)
 
 
 
-iobufferEvent *iobufferEventCreate(struct _eventLoop *evLoop, int fd);
+iobufferEvent *iobufferEventCreate(struct _eventLoop *evLoop, int fd)
+{
+    iobufferEvent *this = NULL;
+    CHECK_INPARA_ENSURE_RETNULL((NULL != evLoop) && (INVALID_FD != fd));
+
+    if (NULL == (this = BASE_CALLOC(1, sizeof(iobufferEvent))))
+    {
+        return NULL;
+    }
+
+    if (RET_OK != ioEventInit(&(this->base), evLoop, fd, EV_NOEVENT, iobufferEventCallback, this))
+    {
+        goto error;
+    }
+
+    if (NULL == (this->input = bufferCreate()) ||
+        NULL == (this->ouput = bufferCreate()))
+    {
+        goto error;
+    }
+
+    return this;
+error:
+    iobufferEventDestroy(this);
+    return NULL;
+}
+
 int iobufferEventCallbacksSet(iobufferEvent *bufferEvent, ioEventRWCallback readcb, ioEventRWCallback writecb, 
-    ioEventErrorCallback errorcb, void *args);
-void iobufferEventDestroy(void *data);
-int iobufferEventEnableRead(ioEvent *ioev);
-int iobufferEventEnableWrite(ioEvent *ioev);
-int iobufferEventDisableRead(ioEvent *ioev);
-int iobufferEventDisableWrite(ioEvent *ioev);
-int iobufferEventDelete(ioEvent *ioev);
+    ioEventErrorCallback errorcb, void *args)
+{
+    CHECK_INPARA_ENSURE(NULL != bufferEvent);
+
+    bufferEvent->readcb = readcb;
+    bufferEvent->writecb = writecb;
+    bufferEvent->errorcb = errorcb;
+    bufferEvent->args = args;
+
+    return RET_OK;
+}
+
+void iobufferEventDestroy(void *data)
+{
+    iobufferEvent *this = (iobufferEvent *)data;
+
+    if (NULL != data)
+    {
+        ioEventDeInit(&(this->base));
+        BASE_DESTROY(this->input, bufferDestroy);
+        BASE_DESTROY(this->output, bufferDestroy);
+        BASE_FREE(this);
+    }
+
+    return ;
+}
+
+int iobufferEventEnableRead(iobufferEvent *this)
+{
+    CHECK_INPARA_ENSURE(NULL != this);
+    this->base.events |= EV_READABLE;
+    return ioEventEnable(&(this->base));
+}
+
+int iobufferEventEnableWrite(iobufferEvent *this)
+{
+    CHECK_INPARA_ENSURE(NULL != this);
+    this->base.events |= EV_WRITEABLE;
+    return ioEventEnable(&(this->base));
+}
+
+int iobufferEventDisableRead(iobufferEvent *this)
+{
+    CHECK_INPARA_ENSURE(NULL != this);
+    this->base.events &= ~EV_READABLE;
+    return ioEventEnable(&(this->base));
+}
+
+int iobufferEventDisableWrite(iobufferEvent *this)
+{
+    CHECK_INPARA_ENSURE(NULL != this);
+    this->base.events &= ~EV_WRITEABLE;
+    return ioEventEnable(&(this->base));
+}
+
+int iobufferEventDelete(iobufferEvent *this)
+{
+    CHECK_INPARA_ENSURE(NULL != this);
+    return ioEventDisable(&(this->base));    
+}
 
 
 

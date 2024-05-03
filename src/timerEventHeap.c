@@ -55,8 +55,23 @@ struct _timerEventHeap
 /**                                       PRIVATE FUNCTIONS                                      **/
 /*************************************************************************************************/
 
+static void timerEventUpdate(timerEventHeap *this)
+{
+    return ;
+}
+
 static void timerEventToioEventCallBack(int fd, uint32_t events, void *arg)
 {
+    
+
+
+
+
+
+
+
+
+    timerEventUpdate(timerEventHeap *this);
     return ;
 }
 
@@ -214,6 +229,9 @@ int timerEventHeapPush(timerEventHeap *this, timerEvent *timerev)
         return RET_ERROR;
     }
     ++ (this->count);
+
+
+    timerEventUpdate(this);
     return RET_OK;
 }
 
@@ -238,6 +256,8 @@ int timerEventHeapErase(timerEventHeap *this, timerEvent *timerev)
             timerEventHeapShiftDown(this, timerev->index, last);
         }
         timerev->index = -1;
+
+        timerEventUpdate(this);
         return RET_OK;
 	}
 
