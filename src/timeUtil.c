@@ -42,3 +42,28 @@ int timeUtilTv2Msec(const struct timeval *tv, long *result)
     return RET_OK;
 }
 
+int timeUtilTimerAdd(const struct timeval *t1, const struct timeval *t2, struct timeval *end)
+{
+    CHECK_INPARA_ENSURE((NULL != t1) && (NULL != t2) && (NULL != end));
+
+    end->tv_sec = t1->tv_sec + t2->tv_sec;
+    end->tv_usec = t1->tv_usec + t2->tv_usec;
+
+	if (end->tv_usec >= 1000000)
+    {			
+		++ (end->tv_sec);				
+		end->tv_usec -= 1000000;	
+    }		
+    return RET_OK;
+}
+
+void timeUtilTimeGet(struct timeval *tv)
+{
+    if (NULL != tv)
+    {
+        gettimeofday(tv, NULL);
+    }
+    return ;
+}
+
+

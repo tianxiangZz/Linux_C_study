@@ -35,6 +35,10 @@ void eventLoopDestroy(void *data);
 void eventLoopispatch(eventLoop *evLoop);
 void eventLoopStop(eventLoop *evLoop);
 
+
+
+
+// 内部函数 请勿使用
 // io event
 int eventLoopAddioEvent(eventLoop *evLoop, ioEvent *ioev);            // TODO ...
 int eventLoopModioEvent(eventLoop *evLoop, ioEvent *ioev);             

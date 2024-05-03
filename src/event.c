@@ -7,7 +7,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-
+#include <unistd.h>  
 
 #include "eventLoop.h"
 #include "event.h"
@@ -78,6 +78,27 @@ static void ioEventDisableInLoop(void *ioev)
     return ;
 }
 
+static void timerEventEnableInLoop(void *data)
+{
+    timerEvent *this = (timerEvent *)data;
+    if (NULL == data)
+    {
+        return ;
+    }
+    eventLoopAddTimerEvent(this->evLoop, this);
+    return ;
+}
+
+static void timerEventDisableInLoop(void *data)
+{
+    timerEvent *this = (timerEvent *)data;
+    if (NULL == data)
+    {
+        return ;
+    }
+    eventLoopDelTimerEvent(this->evLoop, this);
+    return ;
+}
 
 /*************************************************************************************************/
 /**                                       PUBLIC FUNCTIONS                                      **/
@@ -168,8 +189,6 @@ void ioEventDeInit(ioEvent *this)
 
 
 
-
-
 iobufferEvent *iobufferEventCreate(struct _eventLoop *evLoop, int fd);
 int iobufferEventCallbacksSet(iobufferEvent *bufferEvent, ioEventRWCallback readcb, ioEventRWCallback writecb, 
     ioEventErrorCallback errorcb, void *args);
@@ -186,11 +205,56 @@ int iobufferEventDelete(ioEvent *ioev);
 timerEvent *timerEventCreate(struct _eventLoop *evLoop, int flag, 
     struct timeval *tv, timerEventCallback cb, void *args)
 {
+    struct timeval now = { 0 };
     timerEvent *this = NULL;
+    CHECK_INPARA_ENSURE_RETNULL((NULL != evLoop) && (NULL != tv) && (NULL != cb));
+
+    if (NULL == (this = BASE_MALLOC(sizeof(timerEvent))))
+    {
+        return NULL;
+    }
+
+    timeUtilTimeGet(&now);
+    timeUtilTimerAdd(tv, &now, &(this->tv));
+    this->index = -1;
+    this->evLoop = evLoop;
+    this->flag = flag;
+    this->cb = cb;
+    this->args = args;
+    return this;
 }
-void timerEventDestroy(void *data);
-int timerEventEnable(timerEvent *timerev);
-int timerEventStop(timerEvent *timerev);
+
+void timerEventDestroy(void *data)
+{
+    timerEvent *this = (timerEvent *)data;
+    if (NULL != data)
+    {
+        if (-1 != this->index)
+        {
+            timerEventDisable(this);
+            while (-1 != this->index)
+            {
+                usleep(1);
+            }
+        }
+        BASE_FREE(this);
+    }
+    return ;
+}
+
+int timerEventEnable(timerEvent *timerev)
+{
+    CHECK_INPARA_ENSURE(NULL != timerev);
+    sendInLoop(timerev->evLoop, timerEventEnableInLoop, timerev);
+    return RET_OK;
+}
+
+int timerEventDisable(timerEvent *timerev)
+{
+    CHECK_INPARA_ENSURE(NULL != timerev);
+    sendInLoop(timerev->evLoop, timerEventDisableInLoop, timerev);
+    return RET_OK; 
+}
 
 
 
