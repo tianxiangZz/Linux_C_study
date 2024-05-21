@@ -32,7 +32,7 @@ typedef struct _eventLoop eventLoop;
 eventLoop* eventLoopCreate();
 void eventLoopDestroy(void *data);
 
-void eventLoopispatch(eventLoop *evLoop);
+void eventLoopDispatch(eventLoop *evLoop);
 void eventLoopStop(eventLoop *evLoop);
 
 
@@ -41,7 +41,7 @@ void eventLoopStop(eventLoop *evLoop);
 // 内部函数 请勿使用
 // io event
 int eventLoopAddioEvent(eventLoop *evLoop, ioEvent *ioev);            // TODO ...
-int eventLoopModioEvent(eventLoop *evLoop, ioEvent *ioev);             
+int eventLoopModioEvent(eventLoop *evLoop, ioEvent *ioev);
 void eventLoopDelioEvent(eventLoop *evLoop, ioEvent *ioev);
 
 // timer event
@@ -50,8 +50,6 @@ void eventLoopDelTimerEvent(eventLoop *evLoop, timerEvent *tev);
 
 
 void sendInLoop(eventLoop *evLoop, functionInLoop fn, void *arg);
-
-
 int eventLoopForeachioEvents(eventLoop *evLoop, eventLoopForeachEventCb fn, void *arg);
 
 

@@ -32,13 +32,12 @@ typedef struct _timerEvent timerEvent;          // timer event
 struct _signalEvent;
 typedef struct _signalEvent signalEvent;        // signal event TODO...
 
-
 /** io event callback **/
-typedef void (*ioEventCallback)(int , uint32_t, void *);
+typedef void (*ioEventCallback)(int , void *);
 
 /** io buffer event callback **/
-typedef void (*ioEventRWCallback)(ioEvent *, buffer *, void *);
-typedef void (*ioEventErrorCallback)(ioEvent *, uint8_t, void *);
+typedef void (*iobufferEventRWCallback)(buffer *, void *);
+typedef void (*iobufferEventErrorCallback)(uint8_t, void *);
 
 #define EVENT_IN_LOOP      (1)
 /** io event **/
@@ -57,7 +56,7 @@ typedef void (*ioEventErrorCallback)(ioEvent *, uint8_t, void *);
 #define IO_EVENT_ERROR		    (1 << 4)
 
 /** timer event callback **/
-typedef void (*timerEventCallback)(timerEvent *, void *);
+typedef void (*timerEventCallback)(void *);
 
 #define TIMER_FLAG_REPEATE          (1 << 0)
 #define TIMER_FLAG_ONCE             (1 << 1)
@@ -68,16 +67,17 @@ typedef void (*timerEventCallback)(timerEvent *, void *);
 
 struct _ioEvent
 {
-    ioEventCallback cb;
-
     int fd;
     uint32_t events;                /** Events for listen */     
     // uint32_t revent;                /** Triggered events */
     
     int addedInLoop;
-
     struct _eventLoop *evLoop;
     
+    ioEventCallback readcb;
+    ioEventCallback writecb;
+    ioEventCallback closecb;
+    ioEventCallback errorcb;
     void *args;
 };
 
@@ -85,13 +85,13 @@ struct _iobufferEvent
 {
     ioEvent base;
 
-    ioEventRWCallback readcb;
-    ioEventRWCallback writecb;
-    ioEventErrorCallback errorcb;
-
-    void *args;
     buffer *input;
     buffer *ouput;
+
+    iobufferEventRWCallback readcb;
+    iobufferEventRWCallback writecb;
+    iobufferEventErrorCallback errorcb;
+    void *args;
 };
 
 struct _timerEvent
@@ -110,33 +110,27 @@ struct _timerEvent
 /**                                       PUBLIC FUNCTIONS                                      **/
 /*************************************************************************************************/
 
-ioEvent *ioEventCreate(struct _eventLoop *evLoop, int fd, uint32_t events, 
-    ioEventCallback cb, void *args);
+ioEvent *ioEventCreate(struct _eventLoop *evLoop, int fd);
 void ioEventDestroy(void *data);
+int ioEventCallbacksSet(ioEvent *ioev, ioEventCallback readcb, ioEventCallback writecb, ioEventCallback errorcb, void *args);
+void ioEventReadEnable(ioEvent *ioev);
+void ioEventReadDisable(ioEvent *ioev);
+void ioEventWriteEnable(ioEvent *ioev);
+void ioEventWriteDisable(ioEvent *ioev);
+void ioEventAllDisable(ioEvent *ioev);
 
-int ioEventEnable(ioEvent *ioev);
-void ioEventDisable(ioEvent *ioev);
-
-int ioEventInit(ioEvent *ioev, struct _eventLoop *evLoop, int fd, uint32_t events, 
-    ioEventCallback cb, void *args);
+int ioEventInit(ioEvent *ioev, struct _eventLoop *evLoop, int fd);
 void ioEventDeInit(ioEvent *ioev);
 
-
-
-
-
 iobufferEvent *iobufferEventCreate(struct _eventLoop *evLoop, int fd);
-int iobufferEventCallbacksSet(iobufferEvent *bufferEvent, ioEventRWCallback readcb, ioEventRWCallback writecb, 
-    ioEventErrorCallback errorcb, void *args);
 void iobufferEventDestroy(void *data);
-int iobufferEventEnableRead(iobufferEvent *this);
-int iobufferEventEnableWrite(iobufferEvent *this);
-int iobufferEventDisableRead(iobufferEvent *this);
-int iobufferEventDisableWrite(iobufferEvent *this);
-int iobufferEventDelete(iobufferEvent *this);
-
-
-
+int iobufferEventCallbacksSet(iobufferEvent *bufferEvent, iobufferEventRWCallback readcb, iobufferEventRWCallback writecb, 
+    iobufferEventErrorCallback errorcb, void *args);
+int iobufferEventReadEnable(iobufferEvent *this);
+int iobufferEventWriteEnable(iobufferEvent *this);
+int iobufferEventReadDisable(iobufferEvent *this);
+int iobufferEventWriteDisable(iobufferEvent *this);
+int iobufferEventAllDisable(iobufferEvent *this);
 
 timerEvent *timerEventCreate(struct _eventLoop *evLoop, int flag, 
     struct timeval *tv, timerEventCallback cb, void *args);
@@ -149,5 +143,4 @@ int timerEventDisable(timerEvent *timerev);
 }
 #endif                  /** __cplusplus */
 
-
-#endif                  /** __EVENT_BASE_H__ */
+#endif                  /** __EVENT_H__ */
